@@ -136,4 +136,62 @@ const server = http.createServer(async (req, res) => {
       const buf = Buffer.from(await r.arrayBuffer());
       const isText = /^(text\/|application\/(json|javascript|x-javascript|xml|xhtml\+xml))/i.test(contentType) || !contentType;
       const respBody = isText ? buf.toString("utf8") : buf.toString("base64");
-      server.listen(PORT, () => console.log(`Ghost Proxy gateway listening on :${PORT}`));
+      return sendJson(res, 200, {
+        ok: true,
+        status: r.status,
+        contentType,
+        finalUrl,
+        body: respBody,
+        isBase64: !isText,
+      });
+    }
+
+    // ---- /raw : GET, streams the target response (for sub-resources) ----
+    if (url.pathname === "/raw") {
+      const target = url.searchParams.get("url");
+      if (!target) return sendJson(res, 400, { error: "Missing url" });
+      const method = (url.searchParams.get("method") || req.method || "GET").toUpperCase();
+      const headers = buildHeaders(req, target, false);
+      // forward range headers for media
+      const range = req.headers["range"];
+      if (range) headers["range"] = range;
+      const opts = { method, headers, dispatcher, redirect: "follow" };
+      if (!["GET", "HEAD"].includes(method)) {
+        const buf = await readBody(req);
+        if (buf.length) opts.body = buf;
+      }
+      const r = await uFetch(target, opts);
+      const contentType = r.headers.get("content-type") || "application/octet-stream";
+      const finalUrl = r.url || target;
+      const respHeaders = {
+        "content-type": contentType,
+        "x-final-url": finalUrl,
+        "referrer-policy": "no-referrer",
+        "cache-control": /^(text\/css|application\/javascript|text\/javascript|image\/|font\/|audio\/|video\/)/.test(contentType)
+          ? "public, max-age=31536000, immutable"
+          : "no-store",
+      };
+      for (const k of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+        const v = r.headers.get(k);
+        if (v) respHeaders[k] = v;
+      }
+      res.writeHead(r.status, respHeaders);
+      const stream = r.body;
+      if (stream && typeof stream.pipe === "function") {
+        stream.pipe(res);
+        stream.on("error", (e) => { try { res.end(); } catch {} });
+      } else {
+        const buf = Buffer.from(await r.arrayBuffer());
+        res.end(buf);
+      }
+      return;
+    }
+
+    return sendJson(res, 404, { error: "Not found" });
+  } catch (e) {
+    console.error("[gateway] error", e.message);
+    return sendJson(res, 502, { ok: false, error: e.message || "Gateway error" });
+  }
+});
+
+server.listen(PORT, () => console.log(`Ghost Proxy gateway listening on :${PORT}`));
