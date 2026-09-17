@@ -136,3 +136,4 @@ const server = http.createServer(async (req, res) => {
       const buf = Buffer.from(await r.arrayBuffer());
       const isText = /^(text\/|application\/(json|javascript|x-javascript|xml|xhtml\+xml))/i.test(contentType) || !contentType;
       const respBody = isText ? buf.toString("utf8") : buf.toString("base64");
+      server.listen(PORT, () => console.log(`Ghost Proxy gateway listening on :${PORT}`));
