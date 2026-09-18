@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no" />
+    <title>Ghost Proxy</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+      #sj-frame { width: 100vw; height: 100vh; border: none; display: block; }
+      #vp-loading {
+        position: fixed; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 12px;
+        background: #0B0314; color: #fff; z-index: 10;
+        transition: opacity 0.3s ease;
+      }
+      #vp-loading.hidden { opacity: 0; pointer-events: none; }
+      .vp-spinner {
+        width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1);
+        border-top-color: #a855f7; border-radius: 50%; animation: vp-spin 0.8s linear infinite;
+      }
+      @keyframes vp-spin { to { transform: rotate(360deg); } }
+      #vp-loading p { color: rgba(255,255,255,0.6); font-size: 14px; font-family: system-ui, sans-serif; }
+      #vp-error {
+        position: fixed; inset: 0; display: none; flex-direction: column;
+        align-items: center; justify-content: center; gap: 12px; padding: 24px;
+        background: #0B0314; color: #fff; z-index: 20; text-align: center;
+      }
+      #vp-error h2 { font-size: 18px; font-family: system-ui, sans-serif; }
+      #vp-error p { color: rgba(255,255,255,0.5); font-size: 14px; font-family: system-ui, sans-serif; max-width: 400px; }
+    </style>
+    <!-- Scramjet core + BareMux must load before proxy.js -->
+    <script src="/scram/scramjet.all.js"></script>
+    <script src="/baremux/index.js"></script>
+    <script src="/config.js"></script>
+  </head>
+  <body>
+    <div id="vp-loading">
+      <div class="vp-spinner"></div>
+      <p>Tunneling through Ghost…</p>
+    </div>
+    <div id="vp-error">
+      <h2>Proxy couldn't load this page</h2>
+      <p id="vp-error-msg">The service worker or transport failed to initialize.</p>
+    </div>
+    <script src="/proxy.js"></script>
+  </body>
+</html>
