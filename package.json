@@ -4,7 +4,7 @@
   "description": "Ghost Proxy gateway — Scramjet interception proxy with Wisp transport",
   "type": "module",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "start": "node server.js"
@@ -13,7 +13,7 @@
     "@mercuryworkshop/bare-mux": "^2.1.9",
     "@mercuryworkshop/libcurl-transport": "^1.5.2",
     "@mercuryworkshop/scramjet": "https://github.com/MercuryWorkshop/scramjet/releases/download/v1.1.0/mercuryworkshop-scramjet-1.1.0.tgz",
-    "@mercuryworkshop/wisp-js": "^0.4.1",
+    "@mercuryworkshop/wisp-js": "0.4.1",
     "fastify": "^5.7.4",
     "@fastify/static": "^9.0.0",
     "undici": "^6.21.0"
