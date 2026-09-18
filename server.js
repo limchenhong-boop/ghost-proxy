@@ -13,8 +13,8 @@
 //   GET  /raw?url=&key=     -> streams the target response through the proxy (CORS)
 //
 // Env:
-//   PROXY_URL   http://93143ddafb86b99c:0MczPiC3ltnRYHOx@res.proxy-seller.com:10000  (full residential proxy URL)
-//   API_KEY     ghost_8f3a9c2e1d4b7a6f5e0c9d8b7a6f5e0c
+//   PROXY_URL   http://USER:PASS@res.proxy-seller.com:10000   (full residential proxy URL)
+//   API_KEY     shared secret Base44 sends to authenticate
 //   PORT        listen port (default 8080)
 //   ALLOWED_ORIGINS  comma-separated CORS origins (default "*")
 
@@ -27,6 +27,7 @@ const PORT = parseInt(process.env.PORT || "8080", 10);
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || "*";
 const TIMEOUT_MS = 20000;
 const CONNECT_TIMEOUT_MS = 10000;
+const BUILD_VERSION = "v3-withtimeout";
 
 if (!PROXY_URL) {
   console.error("FATAL: PROXY_URL env var is required (http://USER:PASS@host:port)");
@@ -131,7 +132,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ---- health (no auth) ----
-  if (url.pathname === "/health") return sendJson(res, 200, { ok: true });
+  if (url.pathname === "/health") return sendJson(res, 200, { ok: true, build: BUILD_VERSION });
 
   // ---- auth ----
   if (!checkKey(req, url)) return sendJson(res, 401, { error: "Unauthorized" });
