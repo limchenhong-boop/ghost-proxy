@@ -1,59 +1,50 @@
-# Ghost Proxy — Residential Proxy Gateway
+# Ghost Proxy Gateway — Scramjet
 
-A tiny Node service that fetches URLs through your Proxy-Seller residential
-proxy and exposes a simple HTTPS API that Base44 can call.
+A Node.js gateway that runs the [Scramjet](https://github.com/MercuryWorkshop/scramjet) interception proxy with a [Wisp](https://www.npmjs.com/package/@mercuryworkshop/wisp-js) WebSocket transport. The Base44 app embeds this gateway's `/proxy.html` page in an iframe; the service worker intercepts all requests from the proxied site and routes them through the Wisp server, giving full SPA support (YouTube, TikTok, etc.).
 
-Base44's runtime can't tunnel through an HTTP forward proxy, but a normal Node
-host can (via undici's `ProxyAgent`). This gateway runs on such a host and does
-the tunneling for Base44.
+## Architecture
 
-## Deploy
-
-Works on **Render**, **Railway**, **Fly.io**, or **Cloud Run** — any host that
-runs Node and gives you a public HTTPS URL. (Do **not** use Cloudflare Workers —
-it has the same tunneling limitation as Base44.)
-
-### Render (easiest)
-
-1. New → **Web Service** → connect this `gateway/` folder (or a repo containing it).
-2. **Runtime:** Node
-3. **Build Command:** `npm install`
-4. **Start Command:** `npm start`
-5. **Environment Variables:**
-   - `PROXY_URL` = `http://93143ddafb86b99c:0MczPiC3ltnRYHOx@res.proxy-seller.com:10000`
-   - `API_KEY` = (pick a long random string, e.g. `openssl rand -hex 32`)
-   - `ALLOWED_ORIGINS` = `https://ghost-proxy.base44.app`
-6. Deploy. You'll get a URL like `https://ghost-proxy-gateway.onrender.com`.
-
-### Railway / Fly.io / Cloud Run
-
-Same idea: Node 18+, `npm install && npm start`, same env vars, public URL.
-
-## Verify it works
-
-```bash
-# health
-curl https://YOUR-GATEWAY/health
-# -> {"ok":true}
-
-# check the residential egress IP (should be a residential IP, NOT a cloud IP)
-curl "https://YOUR-GATEWAY/ip?key=YOUR_API_KEY"
-# -> {"ip":"<residential-ip>","status":200}
-
-# fetch a page
-curl -X POST https://YOUR-GATEWAY/fetch \
-  -H "x-api-key: YOUR_API_KEY" \
-  -H "content-type: application/json" \
-  -d '{"url":"https://example.com"}'
+```
+Base44 app (ghost-proxy.base44.app)
+  └─ iframe → gateway/proxy.html?url=<target>
+       └─ Scramjet service worker intercepts all requests
+            └─ libcurl transport → Wisp WebSocket (wss://gateway/wisp/)
+                 └─ Wisp server fetches the target site
 ```
 
-If `/ip` returns a residential (non-cloud) IP, the proxy is working.
+## Deploy on Render
 
-## Then tell me
+1. Create a new Web Service on Render, connected to your Git repo.
+2. **Build Command:** `npm install`
+3. **Start Command:** `node server.js`
+4. **Environment Variables:**
+   - `PORT` — Render sets this automatically
+5. The gateway serves:
+   - `/` — proxy page (embedded by the Base44 app)
+   - `/scram/*` — Scramjet core files (WASM + JS)
+   - `/libcurl/*` — libcurl transport
+   - `/baremux/*` — BareMux connection layer
+   - `/wisp/` — Wisp WebSocket endpoint
+   - `/sw.js` — service worker
+   - `/health` — health check
 
-Once deployed, send me:
-1. The gateway URL (e.g. `https://ghost-proxy-gateway.onrender.com`)
-2. The `API_KEY` value
+## Verification
 
-I'll wire `proxyFetch` to route all upstream fetches through the gateway, so
-every page and resource Ghost Proxy loads goes out through your residential IPs.
+```bash
+# Health check
+curl https://your-gateway.onrender.com/health
+# → {"ok":true,"build":"scramjet-v4"}
+
+# Proxy page
+curl https://your-gateway.onrender.com/proxy.html?url=https://example.com
+# → HTML page with Scramjet proxy
+```
+
+## Integration
+
+Set the `GATEWAY_URL` secret in the Base44 app to your deployed gateway URL:
+```
+GATEWAY_URL=https://your-gateway.onrender.com
+```
+
+The Base44 app fetches this URL via the `proxyFetch` function's config endpoint and constructs iframe URLs as `GATEWAY_URL/proxy.html?url=<target>`.
