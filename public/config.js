@@ -1,1 +1,1 @@
-let _CONFIG = {};
+self.GHOST_CONFIG={prefix:"/service/",diagnostics:true};
