@@ -1,16 +1,1 @@
-importScripts("/scram/scramjet.all.js");
-
-const { ScramjetServiceWorker } = $scramjetLoadWorker();
-const scramjet = new ScramjetServiceWorker();
-
-async function handleRequest(event) {
-  await scramjet.loadConfig();
-  if (scramjet.route(event)) {
-    return scramjet.fetch(event);
-  }
-  return fetch(event.request);
-}
-
-self.addEventListener("fetch", (event) => {
-  event.respondWith(handleRequest(event));
-});
+importScripts("/config.js","/scram/scramjet.all.js","/transport-diagnostics.js");const loaded=$scramjetLoadWorker(),scramjet=new loaded.ScramjetServiceWorker();let ready;self.addEventListener("message",({data})=>{if(data?.scramjet$type==="loadConfig"){scramjet.config=undefined;ready=undefined}});if(self.GHOST_CONFIG?.diagnostics)attachTransportDiagnostics(scramjet);self.addEventListener("install",()=>self.skipWaiting());self.addEventListener("activate",event=>event.waitUntil(self.clients.claim()));self.addEventListener("fetch",event=>event.respondWith((async()=>{if(!ready)ready=scramjet.loadConfig();await ready;if(scramjet.config&&scramjet.route(event))return scramjet.fetch(event);const url=new URL(event.request.url);if(/^https?:$/.test(url.protocol)&&url.origin!==self.location.origin)return new Response("Direct fallback disabled",{status:502});return fetch(event.request)})()));
