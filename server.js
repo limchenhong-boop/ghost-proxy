@@ -13,7 +13,7 @@
 //   GET  /raw?url=&key=     -> streams the target response through the proxy (CORS)
 //
 // Env:
-//   PROXY_URL   http://93143ddafb86b99c:0MczPiC3ltnRYHOx@res.proxy-seller.com:10000   (full residential proxy URL)
+//   PROXY_URL   http://93143ddafb86b99c:0MczPiC3ltnRYHOx@res.proxy-seller.com:10000  (full residential proxy URL)
 //   API_KEY     ghost_8f3a9c2e1d4b7a6f5e0c9d8b7a6f5e0c
 //   PORT        listen port (default 8080)
 //   ALLOWED_ORIGINS  comma-separated CORS origins (default "*")
@@ -90,6 +90,17 @@ function readBody(req) {
   });
 }
 
+// Race a promise against a hard timeout so a hung proxy CONNECT can never
+// hang the whole request past Render's 30s gateway limit — we always return
+// a readable JSON error instead of a Render 502 page.
+function withTimeout(promise, ms, label) {
+  let timer;
+  const t = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label + " timeout (" + ms + "ms)")), ms);
+  });
+  return Promise.race([promise, t]).finally(() => clearTimeout(timer));
+}
+
 function buildHeaders(req, targetUrl, isJsonPost, contentType) {
   const parsed = new URL(targetUrl);
   const h = {
@@ -129,10 +140,11 @@ const server = http.createServer(async (req, res) => {
   try {
     // ---- /ip : verify residential egress ----
     if (url.pathname === "/ip") {
-      const r = await uFetch("https://api.ipify.org?format=json", {
-        dispatcher: getDispatcher(),
-        signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
-      });
+      const r = await withTimeout(
+        uFetch("https://api.ipify.org?format=json", { dispatcher: getDispatcher() }),
+        CONNECT_TIMEOUT_MS,
+        "proxy /ip"
+      );
       const j = await r.json();
       return sendJson(res, 200, { ip: j.ip, status: r.status });
     }
@@ -148,10 +160,11 @@ const server = http.createServer(async (req, res) => {
       } catch (e) { proxyScheme = "INVALID_URL"; }
       let ipErr = null, ipOk = false, ip = null;
       try {
-        const r = await uFetch("https://api.ipify.org?format=json", {
-          dispatcher: getDispatcher(),
-          signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
-        });
+        const r = await withTimeout(
+          uFetch("https://api.ipify.org?format=json", { dispatcher: getDispatcher() }),
+          CONNECT_TIMEOUT_MS,
+          "proxy /diag"
+        );
         ipOk = r.ok;
         const j = await r.json().catch(() => ({}));
         ip = j.ip || null;
@@ -176,7 +189,7 @@ const server = http.createServer(async (req, res) => {
       const opts = { method, headers, dispatcher: getDispatcher(), redirect: "follow" };
       if (!["GET", "HEAD"].includes(method) && body.body != null) opts.body = String(body.body);
 
-      const r = await uFetch(target, opts);
+      const r = await withTimeout(uFetch(target, opts), TIMEOUT_MS, "proxy /fetch");
       const contentType = r.headers.get("content-type") || "";
       const finalUrl = r.url || target;
       const buf = Buffer.from(await r.arrayBuffer());
