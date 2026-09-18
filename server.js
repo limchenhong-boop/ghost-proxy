@@ -67,9 +67,14 @@ const fastify = Fastify({
 // Serve our custom proxy page + service worker
 fastify.register(fastifyStatic, {
   root: publicPath,
-  prefix: "/",
   decorateReply: true,
 });
+
+// Explicit routes for critical proxy files (reliable fallback)
+fastify.get("/proxy.html", (req, reply) => reply.sendFile("proxy.html"));
+fastify.get("/proxy.js", (req, reply) => reply.sendFile("proxy.js"));
+fastify.get("/sw.js", (req, reply) => reply.sendFile("sw.js"));
+fastify.get("/config.js", (req, reply) => reply.sendFile("config.js"));
 
 // Serve Scramjet core files at /scram/
 fastify.register(fastifyStatic, {
